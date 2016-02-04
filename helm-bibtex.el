@@ -967,6 +967,59 @@ entry for each BibTeX file that will open that file for editing."
     (action          . helm-bibtex-fallback-action))
   "Source for online look-up.")
 
+(defun clean-arxivid (arxivid)
+  (if (and (stringp arxivid) (string-match "arXiv:" arxivid))
+      (replace-match "" nil nil arxivid)
+    arxivid))
+
+(defun helm-find-arxivid (arxiv-item)
+  "Open the page arxiv-item (either 'pdf' or 'abs') in associated arXiv entry in a browser."
+  (let ((keys (helm-marked-candidates :with-wildcard t)))
+    (dolist (key keys)
+      (let* ((entry (helm-bibtex-get-entry key))
+             (arxivid (clean-arxivid (helm-bibtex-get-value "arXivid" entry)))
+             (eprint (clean-arxivid (helm-bibtex-get-value "eprint" entry)))
+             (eprint-choice (if eprint eprint arxivid))
+             (browse-url-browser-function
+              (or helm-bibtex-browser-function
+                  browse-url-browser-function)))
+        (if eprint-choice
+            (let* ((arxiv-url (s-concat "http://arxiv.org/" arxiv-item "/" eprint-choice)))
+              (helm-browse-url arxiv-url))
+          (message "No arXivid for entry"))))))
+
+(defun helm-open-arxiv-pdf-in-emacs (_)
+  "Open the arXiv pdf in emacs"
+  (let ((keys (helm-marked-candidates :with-wildcard t)))
+    (dolist (key keys)
+      (let* ((entry (helm-bibtex-get-entry key))
+             (arxivid (clean-arxivid (helm-bibtex-get-value "arXivid" entry)))
+             (eprint (clean-arxivid (helm-bibtex-get-value "eprint" entry)))
+             (eprint-choice (if eprint eprint arxivid)))
+        (if eprint-choice
+            (let* ((arxiv-url (s-concat "http://arxiv.org/" "pdf" "/" eprint-choice))
+                   (tmp-pdf (s-concat (make-temp-file "arXiv") ".pdf")))
+              (url-copy-file arxiv-url tmp-pdf)
+              (find-file tmp-pdf))
+          (message "No arXivid for entry"))))))
+
+(defun helm-bibtex-open-arxiv-abs-url (_)
+  "Open the associated arXiv abstract in a browser."
+  (helm-find-arxivid "abs"))
+
+(defun helm-bibtex-open-arxiv-pdf-url (_)
+  "Open the associated arXiv pdf in a browser."
+  (helm-find-arxivid "pdf"))
+
+(helm-add-action-to-source "Open arXiv abstract url"
+                           'helm-bibtex-open-arxiv-abs-url helm-source-bibtex 10)
+
+(helm-add-action-to-source "Open arXiv pdf url"
+                           'helm-bibtex-open-arxiv-pdf-url helm-source-bibtex 11)
+
+(helm-add-action-to-source "Open arXiv pdf in emacs"
+                           'helm-open-arxiv-pdf-in-emacs helm-source-bibtex 12)
+
 ;;;###autoload
 (defun helm-bibtex (&optional arg)
   "Search BibTeX entries.
