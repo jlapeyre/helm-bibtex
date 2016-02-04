@@ -1020,6 +1020,32 @@ entry for each BibTeX file that will open that file for editing."
 (helm-add-action-to-source "Open arXiv pdf in emacs"
                            'helm-open-arxiv-pdf-in-emacs helm-source-bibtex 12)
 
+(defvar helm-bibtex-bib-key-file "bibkeys.txt"
+  "File containing list of keys extracted from .aux file.")
+
+(defvar helm-bibtex-newbibtex-file "newbib.bib"
+  "File to write generated bibtex entries to.")
+
+(defun helm-bibtex-bib-key-read-lines (filePath)
+  "Return a list of lines of a file at filePath."
+  (with-temp-buffer
+    (insert-file-contents filePath)
+    (split-string (buffer-string) "\n" t)))
+
+;; Note this needs helm-bibtex to be loaded
+;; Silently ignore bibtex keys that cannot be found
+(defun helm-bibtex-generate-bibtex-file-from-keys ()
+  "Generate a bibtex file from a list of keys using helm-bibtex"
+  (interactive)
+  (let* ((my-new-bib-file (read-file-name "File name to write bibtex entries to:" nil nil nil helm-bibtex-newbibtex-file))
+         (bibkeys (helm-bibtex-bib-key-read-lines helm-bibtex-bib-key-file))
+         (insert-default-directory t))
+         (setq helm-bibtex-newbibtex-file (file-name-nondirectory my-new-bib-file))
+         (switch-to-buffer (generate-new-buffer my-new-bib-file))
+         (set-visited-file-name my-new-bib-file)
+         (bibtex-mode)
+         (--map (condition-case nil (insert (helm-bibtex-make-bibtex it)) (error nil)) (sort (-distinct bibkeys) 'string< ))))
+
 ;;;###autoload
 (defun helm-bibtex (&optional arg)
   "Search BibTeX entries.
