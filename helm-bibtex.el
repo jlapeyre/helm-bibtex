@@ -586,7 +586,21 @@ matching PDFs for an entry, the first is opened."
       (-flatten
        (-map 'helm-bibtex-find-pdf (helm-marked-candidates :with-wildcard t)))
       (-each it helm-bibtex-pdf-open-function)
-    (message "No PDF(s) found.")))
+      (message "No PDF(s) found.")))
+
+(defun helm-bibtex-open-pdf-or-arxiv-pdf (_)
+  "Open the PDFs associated with the marked entries using the
+function specified in `helm-bibtex-pdf-open-function'.  All paths
+in `helm-bibtex-library-path' are searched.  If there are several
+matching PDFs for an entry, the first is opened. If not PDF is
+found, open the arXiv PDF if possible."
+  (--if-let
+      (-flatten
+       (-map 'helm-bibtex-find-pdf (helm-marked-candidates :with-wildcard t)))
+      (-each it helm-bibtex-pdf-open-function)
+      (if (helm-open-arxiv-pdf-in-emacs1) t
+          (message "No PDF or arXivid for entry."))))      
+;    (message "No PDF(s) found.")))
 
 (defun helm-bibtex-open-url-or-doi (_)
   "Open the associated URL or DOI in a browser."
@@ -947,7 +961,7 @@ entry for each BibTeX file that will open that file for editing."
     (init                                      . helm-bibtex-init)
     (candidates                                . helm-bibtex-candidates)
     (filtered-candidate-transformer            . helm-bibtex-candidates-formatter)
-    (action . (("Open PDF file (if present)"   . helm-bibtex-open-pdf)
+    (action . (("Open local PDF file or arXiv pdf (if present)"  . helm-bibtex-open-pdf-or-arxiv-pdf)
                ("Open URL or DOI in browser"   . helm-bibtex-open-url-or-doi)
                ("Insert citation"              . helm-bibtex-insert-citation)
                ("Insert reference"             . helm-bibtex-insert-reference)
@@ -990,6 +1004,11 @@ entry for each BibTeX file that will open that file for editing."
 
 (defun helm-open-arxiv-pdf-in-emacs (_)
   "Open the arXiv pdf in emacs"
+  (if (helm-open-arxiv-pdf-in-emacs1) t
+          (message "No arXivid for entry.")))
+
+(defun helm-open-arxiv-pdf-in-emacs-old (_)
+  "Open the arXiv pdf in emacs"
   (let ((keys (helm-marked-candidates :with-wildcard t)))
     (dolist (key keys)
       (let* ((entry (helm-bibtex-get-entry key))
@@ -1002,6 +1021,22 @@ entry for each BibTeX file that will open that file for editing."
               (url-copy-file arxiv-url tmp-pdf)
               (find-file tmp-pdf))
           (message "No arXivid for entry"))))))
+
+(defun helm-open-arxiv-pdf-in-emacs1 ()
+  "Open the arXiv pdf in emacs"
+  (let ((keys (helm-marked-candidates :with-wildcard t)) (found-pdf))
+    (dolist (key keys found-pdf)
+      (let* ((entry (helm-bibtex-get-entry key))
+             (arxivid (clean-arxivid (helm-bibtex-get-value "arXivid" entry)))
+             (eprint (clean-arxivid (helm-bibtex-get-value "eprint" entry)))
+             (eprint-choice (if eprint eprint arxivid)))
+        (if eprint-choice
+            (let* ((arxiv-url (s-concat "http://arxiv.org/" "pdf" "/" eprint-choice))
+                   (tmp-pdf (s-concat (make-temp-file "arXiv") ".pdf")))
+              (url-copy-file arxiv-url tmp-pdf)
+              (find-file tmp-pdf)
+              (setq found-pdf t))
+          (setq found-pdf nil))))))
 
 (defun helm-bibtex-open-arxiv-abs-url (_)
   "Open the associated arXiv abstract in a browser."
